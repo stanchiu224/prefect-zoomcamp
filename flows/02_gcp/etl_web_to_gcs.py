@@ -1,13 +1,16 @@
 from pathlib import Path
 import pandas as pd
 from prefect import flow, task
+from prefect.tasks import task_input_hash
 from prefect_gcp.cloud_storage import GcsBucket
 from random import randint
+from datetime import timedelta
 
 
-@task(retries=3)
+@task(retries=3, cache_key_fn=task_input_hash, cache_expiration=timedelta(days=1))
 def fetch(dataset_url: str) -> pd.DataFrame:
     """Read taxi data from web into pandas DataFrame"""
+    # the following commented out code is to test retries function:
     # if randint(0, 1) > 0:
     #     raise Exception
 
@@ -16,19 +19,52 @@ def fetch(dataset_url: str) -> pd.DataFrame:
 
 
 @task(log_prints=True)
-def clean(df: pd.DataFrame) -> pd.DataFrame:
+def clean(df: pd.DataFrame, month: int, year: int) -> pd.DataFrame:
     """Fix dtype issues"""
     df["tpep_pickup_datetime"] = pd.to_datetime(df["tpep_pickup_datetime"])
     df["tpep_dropoff_datetime"] = pd.to_datetime(df["tpep_dropoff_datetime"])
+
+    """filter out rows outside of target month and year"""
+    df = df[df["tpep_pickup_datetime"].dt.year == year]
+    df = df[df["tpep_pickup_datetime"].dt.month == month]
+
     print(df.head(2))
     print(f"columns: {df.dtypes}")
     print(f"rows: {len(df)}")
     return df
 
 
+# unit test for clean function:
+def test_clean(year: int, month: int):
+    # create a df with test data
+    df_test = pd.DataFrame(
+        {
+            "tpep_pickup_datetime": [
+                "2021-01-01 00:00:00",
+                "2020-01-01 00:00:00",
+                "2021-02-01 00:00:00",
+            ],
+            "tpep_dropoff_datetime": [
+                "2021-01-01 00:00:00",
+                "2020-01-01 01:00:00",
+                "2021-02-01 01:00:00",
+            ],
+        }
+    )
+    df_clean = clean(df_test)
+    assert df_clean["tpep_pickup_datetime"].dtype == "datetime64[ns]"
+    assert df_clean["tpep_dropoff_datetime"].dtype == "datetime64[ns]"
+
+    # check for rows outside of target month and year
+    assert len(df_clean) == 1
+    assert df_clean["tpep_pickup_datetime"].dt.year[0] == year
+    assert df_clean["tpep_pickup_datetime"].dt.month[0] == month
+
+
 @task()
 def write_local(df: pd.DataFrame, color: str, dataset_file: str) -> Path:
     """Write DataFrame out locally as parquet file"""
+    Path(f"data/{color}/{dataset_file}").mkdir(parents=True, exist_ok=True)
     path = Path(f"data/{color}/{dataset_file}.parquet")
     df.to_parquet(path, compression="gzip")
     return path
@@ -37,7 +73,7 @@ def write_local(df: pd.DataFrame, color: str, dataset_file: str) -> Path:
 @task()
 def write_gcs(path: Path) -> None:
     """Upload local parquet file to GCS"""
-    gcs_block = GcsBucket.load("zoom-gcs")
+    gcs_block = GcsBucket.load("zoomcamp-gcs-bucket")
     gcs_block.upload_from_path(from_path=path, to_path=path)
     return
 
@@ -48,11 +84,13 @@ def etl_web_to_gcs() -> None:
     color = "yellow"
     year = 2021
     month = 1
+
+    # the f-string for the dataset file is the format of the file names from the data source.
     dataset_file = f"{color}_tripdata_{year}-{month:02}"
     dataset_url = f"https://github.com/DataTalksClub/nyc-tlc-data/releases/download/{color}/{dataset_file}.csv.gz"
 
     df = fetch(dataset_url)
-    df_clean = clean(df)
+    df_clean = clean(df, month, year)
     path = write_local(df_clean, color, dataset_file)
     write_gcs(path)
 
