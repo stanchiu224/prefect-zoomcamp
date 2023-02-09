@@ -39,7 +39,7 @@ def write_local(df: pd.DataFrame, color: str, dataset_file: str) -> Path:
 @task()
 def write_gcs(path: Path) -> None:
     """Upload local parquet file to GCS"""
-    gcs_block = GcsBucket.load("zoom-gcs")
+    gcs_block = GcsBucket.load("zoomcamp-gcs-bucket")
     gcs_block.upload_from_path(from_path=path, to_path=path)
     return
 
@@ -60,11 +60,13 @@ def etl_web_to_gcs(year: int, month: int, color: str) -> None:
 def etl_parent_flow(
     months: list[int] = [1, 2], year: int = 2021, color: str = "yellow"
 ):
+    # the value parameters above are just default values and are used if parameters are not given in __main__
     for month in months:
         etl_web_to_gcs(year, month, color)
 
 
 if __name__ == "__main__":
+    # parameters for etl_parent_flow are defined below
     color = "yellow"
     months = [1, 2, 3]
     year = 2021
