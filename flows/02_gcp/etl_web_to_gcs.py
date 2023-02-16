@@ -82,7 +82,7 @@ def write_gcs(path: Path) -> None:
 def etl_web_to_gcs() -> None:
     """The main ETL function"""
     color = "yellow"
-    year = 2021
+    year = 2020
     month = 1
 
     # the f-string for the dataset file is the format of the file names from the data source.
