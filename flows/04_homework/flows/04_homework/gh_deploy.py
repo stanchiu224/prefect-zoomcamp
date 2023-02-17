@@ -10,7 +10,6 @@ github_dep = Deployment.build_from_flow(
     name="github-to-gcs-flow",
     parameters={"color": "green", "months": [11], "years": [2020]},
 )
-github_dep.update()
 
 if __name__ == "__main__":
     github_dep.apply()
