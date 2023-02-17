@@ -29,8 +29,8 @@ def fetch(dataset_url: str) -> pd.DataFrame:
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     print(f"Cleaning dataframe.")
     """Fix dtype issues"""
-    df["tpep_pickup_datetime"] = pd.to_datetime(df["tpep_pickup_datetime"])
-    df["tpep_dropoff_datetime"] = pd.to_datetime(df["tpep_dropoff_datetime"])
+    df["Ipep_pickup_datetime"] = pd.to_datetime(df["Ipep_pickup_datetime"])
+    df["Ipep_dropoff_datetime"] = pd.to_datetime(df["Ipep_dropoff_datetime"])
     print(df.head(2))
     print(f"columns: {df.dtypes}")
     print(f"rows: {len(df)}")
